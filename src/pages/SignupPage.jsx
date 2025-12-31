@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const API = "http://localhost:5001";
+
+const API = "https://ecard-backend-pdsx.onrender.com";
+
 
 export default function SignupPage() {
   const { login } = useAuth();

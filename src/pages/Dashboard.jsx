@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import CreateEcardModal from "../components/CreateEcardModal";
 
-const API = "http://localhost:5001";
+const API = "https://ecard-backend-pdsx.onrender.com";
+
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
