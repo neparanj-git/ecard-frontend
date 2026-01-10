@@ -1,49 +1,39 @@
 import { useEffect, useState } from "react";
 
+const API = "http://localhost:5001";
+
 export default function CreateEcardModal({ onClose, onSave, initialData }) {
 
   const emptyForm = {
     id: "",
-
-    // BASIC INFO
     fullName: "",
     designation: "",
     company: "",
     tagline: "",
 
-    // CONTACTS (MULTIPLE WITH ADD BUTTONS)
-    phones: [""],
+    phones: [""],                 // ✅ ADDED UI SUPPORT
     whatsapps: [""],
     emails: [""],
     addresses: [""],
     maps: [""],
 
-    // SOCIAL LINKS (REMEMBER: SINGLE, AS BEFORE)
-    instagram: "",
-    facebook: "",
-    linkedin: "",
-    youtube: "",
-    twitter: "",
+    instagram: [""],
+    twitter: [""],
+    facebook: [""],
+    youtube: [""],
+    whatsappLinks: [""],
 
-    // ABOUT
-    about: "",
+    about: "",                    // ✅ ADDED UI SUPPORT
 
-    // SERVICES
     services: [{ title: "", description: "" }],
-
-    // TESTIMONIALS
     testimonials: [{ name: "", message: "" }],
 
-    // CTA
-    ctaText: "",
-    ctaLink: "",
+    shareMessage: "",
   };
 
   const [form, setForm] = useState(emptyForm);
 
-  /* =====================
-     LOAD DATA FOR EDIT
-  ===================== */
+  /* LOAD DATA FOR EDIT */
   useEffect(() => {
     if (initialData) {
       setForm({
@@ -54,24 +44,34 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
         emails: initialData.emails || [""],
         addresses: initialData.addresses || [""],
         maps: initialData.maps || [""],
+
+        instagram: initialData.instagram || [""],
+        twitter: initialData.twitter || [""],
+        facebook: initialData.facebook || [""],
+        youtube: initialData.youtube || [""],
+        whatsappLinks: initialData.whatsappLinks || [""],
+
+        about: initialData.about || "",
+
         services: initialData.services?.length
           ? initialData.services
           : [{ title: "", description: "" }],
+
         testimonials: initialData.testimonials?.length
           ? initialData.testimonials
           : [{ name: "", message: "" }],
+
+        shareMessage: initialData.shareMessage || "",
       });
     } else {
       setForm(emptyForm);
     }
   }, [initialData]);
 
-  /* =====================
-     GENERIC ARRAY HANDLERS
-  ===================== */
-  const updateArray = (key, index, value) => {
+  /* ===== GENERIC ARRAY HANDLERS ===== */
+  const updateArray = (key, i, value) => {
     const updated = [...form[key]];
-    updated[index] = value;
+    updated[i] = value;
     setForm({ ...form, [key]: updated });
   };
 
@@ -79,14 +79,13 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
     setForm({ ...form, [key]: [...form[key], ""] });
   };
 
-  const removeFromArray = (key, index) => {
-    const updated = form[key].filter((_, i) => i !== index);
+  const removeFromArray = (key, i) => {
+    if (i === 0) return;
+    const updated = form[key].filter((_, index) => index !== i);
     setForm({ ...form, [key]: updated.length ? updated : [""] });
   };
 
-  /* =====================
-     SERVICES
-  ===================== */
+  /* ===== SERVICES ===== */
   const updateService = (i, field, value) => {
     const updated = [...form.services];
     updated[i][field] = value;
@@ -94,17 +93,21 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
   };
 
   const addService = () => {
-    setForm({ ...form, services: [...form.services, { title: "", description: "" }] });
+    setForm({
+      ...form,
+      services: [...form.services, { title: "", description: "" }],
+    });
   };
 
   const removeService = (i) => {
-    const updated = form.services.filter((_, index) => index !== i);
-    setForm({ ...form, services: updated.length ? updated : [{ title: "", description: "" }] });
+    if (i === 0) return;
+    setForm({
+      ...form,
+      services: form.services.filter((_, index) => index !== i),
+    });
   };
 
-  /* =====================
-     TESTIMONIALS
-  ===================== */
+  /* ===== TESTIMONIALS ===== */
   const updateTestimonial = (i, field, value) => {
     const updated = [...form.testimonials];
     updated[i][field] = value;
@@ -112,17 +115,51 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
   };
 
   const addTestimonial = () => {
-    setForm({ ...form, testimonials: [...form.testimonials, { name: "", message: "" }] });
+    setForm({
+      ...form,
+      testimonials: [...form.testimonials, { name: "", message: "" }],
+    });
   };
 
   const removeTestimonial = (i) => {
-    const updated = form.testimonials.filter((_, index) => index !== i);
-    setForm({ ...form, testimonials: updated.length ? updated : [{ name: "", message: "" }] });
+    if (i === 0) return;
+    setForm({
+      ...form,
+      testimonials: form.testimonials.filter((_, index) => index !== i),
+    });
   };
 
-  const handleSubmit = () => {
-    onSave(form);
-    onClose();
+  const generateSlug = (name) =>
+  name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+
+  /* SAVE */
+  const handleSubmit = async () => {
+    try {
+      const payload = {
+  ...form,
+  id: form.id || Date.now().toString(),
+  slug: generateSlug(form.fullName),
+};
+
+
+      const res = await fetch(`${API}/api/ecards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error();
+
+      const saved = await res.json();
+      onSave(saved);
+      onClose();
+    } catch {
+      alert("Failed to save e-card");
+    }
   };
 
   return (
@@ -132,58 +169,41 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
 
         {/* BASIC INFO */}
         <Section title="Basic Info">
-          <Input value={form.fullName} onChange={(e)=>setForm({...form,fullName:e.target.value})} placeholder="Full Name" />
-          <Input value={form.designation} onChange={(e)=>setForm({...form,designation:e.target.value})} placeholder="Designation" />
-          <Input value={form.company} onChange={(e)=>setForm({...form,company:e.target.value})} placeholder="Company" />
-          <Input value={form.tagline} onChange={(e)=>setForm({...form,tagline:e.target.value})} placeholder="Tagline" />
+          <Input placeholder="Full Name" value={form.fullName} onChange={e=>setForm({...form,fullName:e.target.value})}/>
+          <Input placeholder="Designation" value={form.designation} onChange={e=>setForm({...form,designation:e.target.value})}/>
+          <Input placeholder="Company" value={form.company} onChange={e=>setForm({...form,company:e.target.value})}/>
+          <Input placeholder="Tagline" value={form.tagline} onChange={e=>setForm({...form,tagline:e.target.value})}/>
         </Section>
 
-        {/* CONTACT DETAILS */}
-        <Section title="Contact Details">
+        {/* ✅ PHONE NUMBERS */}
+        <RepeatSection
+          title="Phone Numbers"
+          arr="phones"
+          placeholder="Phone Number"
+          form={form}
+          update={updateArray}
+          add={addToArray}
+          remove={removeFromArray}
+        />
 
-          {["phones","whatsapps","emails","addresses","maps"].map((key) => (
-            <div key={key}>
-              <h5 style={{ marginBottom: 6 }}>{key.toUpperCase()}</h5>
+        {/* CONTACT FIELDS */}
+        <RepeatSection title="Emails" arr="emails" placeholder="Email" form={form} update={updateArray} add={addToArray} remove={removeFromArray}/>
+        <RepeatSection title="Google Maps" arr="maps" placeholder="Google Maps Link" form={form} update={updateArray} add={addToArray} remove={removeFromArray}/>
 
-              {form[key].map((val, i) => (
-                <div key={i} style={serviceBox}>
-                  <input
-                    style={input}
-                    value={val}
-                    onChange={(e)=>updateArray(key,i,e.target.value)}
-                    placeholder={`Enter ${key.slice(0,-1)}`}
-                  />
-                  {form[key].length > 1 && (
-                    <button onClick={()=>removeFromArray(key,i)} style={removeBtn}>
-                      Remove
-                    </button>
-                  )}
-                </div>
-              ))}
+        {/* SOCIAL LINKS */}
+        <RepeatSection title="Instagram" arr="instagram" placeholder="Instagram URL" form={form} update={updateArray} add={addToArray} remove={removeFromArray}/>
+        <RepeatSection title="Twitter" arr="twitter" placeholder="Twitter URL" form={form} update={updateArray} add={addToArray} remove={removeFromArray}/>
+        <RepeatSection title="Facebook" arr="facebook" placeholder="Facebook URL" form={form} update={updateArray} add={addToArray} remove={removeFromArray}/>
+        <RepeatSection title="YouTube" arr="youtube" placeholder="YouTube URL" form={form} update={updateArray} add={addToArray} remove={removeFromArray}/>
+        <RepeatSection title="WhatsApp" arr="whatsapps" placeholder="WhatsApp Number" form={form} update={updateArray} add={addToArray} remove={removeFromArray}/>
 
-              <button onClick={()=>addToArray(key)} style={addBtn}>
-                + Add {key.slice(0,-1)}
-              </button>
-            </div>
-          ))}
-        </Section>
-
-        {/* SOCIAL LINKS (UNCHANGED) */}
-        <Section title="Social Links">
-          <Input value={form.instagram} onChange={(e)=>setForm({...form,instagram:e.target.value})} placeholder="Instagram URL" />
-          <Input value={form.facebook} onChange={(e)=>setForm({...form,facebook:e.target.value})} placeholder="Facebook URL" />
-          <Input value={form.linkedin} onChange={(e)=>setForm({...form,linkedin:e.target.value})} placeholder="LinkedIn URL" />
-          <Input value={form.youtube} onChange={(e)=>setForm({...form,youtube:e.target.value})} placeholder="YouTube URL" />
-          <Input value={form.twitter} onChange={(e)=>setForm({...form,twitter:e.target.value})} placeholder="Twitter / X URL" />
-        </Section>
-
-        {/* ABOUT */}
+        {/* ✅ ABOUT */}
         <Section title="About">
           <textarea
             style={textarea}
+            placeholder="About you / your business"
             value={form.about}
-            onChange={(e)=>setForm({...form,about:e.target.value})}
-            placeholder="About you / business"
+            onChange={e=>setForm({...form,about:e.target.value})}
           />
         </Section>
 
@@ -191,9 +211,9 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
         <Section title="Services">
           {form.services.map((s,i)=>(
             <div key={i} style={serviceBox}>
-              <input style={input} value={s.title} onChange={(e)=>updateService(i,"title",e.target.value)} placeholder="Service Title" />
-              <input style={input} value={s.description} onChange={(e)=>updateService(i,"description",e.target.value)} placeholder="Service Description" />
-              {form.services.length>1 && <button onClick={()=>removeService(i)} style={removeBtn}>Remove</button>}
+              <Input placeholder="Service Title" value={s.title} onChange={e=>updateService(i,"title",e.target.value)}/>
+              <Input placeholder="Service Description" value={s.description} onChange={e=>updateService(i,"description",e.target.value)}/>
+              {i>0 && <button onClick={()=>removeService(i)} style={cancelMiniBtn}>Cancel</button>}
             </div>
           ))}
           <button onClick={addService} style={addBtn}>+ Add Service</button>
@@ -203,18 +223,17 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
         <Section title="Testimonials">
           {form.testimonials.map((t,i)=>(
             <div key={i} style={serviceBox}>
-              <input style={input} value={t.name} onChange={(e)=>updateTestimonial(i,"name",e.target.value)} placeholder="Client Name" />
-              <textarea style={textarea} value={t.message} onChange={(e)=>updateTestimonial(i,"message",e.target.value)} placeholder="Message" />
-              {form.testimonials.length>1 && <button onClick={()=>removeTestimonial(i)} style={removeBtn}>Remove</button>}
+              <Input placeholder="Client Name" value={t.name} onChange={e=>updateTestimonial(i,"name",e.target.value)}/>
+              <textarea style={textarea} placeholder="Message" value={t.message} onChange={e=>updateTestimonial(i,"message",e.target.value)}/>
+              {i>0 && <button onClick={()=>removeTestimonial(i)} style={cancelMiniBtn}>Cancel</button>}
             </div>
           ))}
           <button onClick={addTestimonial} style={addBtn}>+ Add Testimonial</button>
         </Section>
 
-        {/* CTA */}
-        <Section title="Call To Action">
-          <Input value={form.ctaText} onChange={(e)=>setForm({...form,ctaText:e.target.value})} placeholder="Button Text" />
-          <Input value={form.ctaLink} onChange={(e)=>setForm({...form,ctaLink:e.target.value})} placeholder="Button Link" />
+        {/* SHARE MESSAGE */}
+        <Section title="WhatsApp Share Message">
+          <textarea style={textarea} value={form.shareMessage} onChange={e=>setForm({...form,shareMessage:e.target.value})}/>
         </Section>
 
         <div style={actions}>
@@ -226,83 +245,30 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
   );
 }
 
-/* ---------- SMALL COMPONENTS ---------- */
-
-const Section = ({ title, children }) => (
-  <div style={{ marginBottom: 25 }}>
-    <h4 style={{ marginBottom: 10 }}>{title}</h4>
-    {children}
-  </div>
+/* ===== REUSABLE REPEAT SECTION ===== */
+const RepeatSection = ({ title, arr, placeholder, form, update, add, remove }) => (
+  <Section title={title}>
+    {form[arr].map((v,i)=>(
+      <div key={i} style={{ display:"flex", gap:8, alignItems:"center" }}>
+        <Input value={v} placeholder={placeholder} onChange={e=>update(arr,i,e.target.value)}/>
+        {i>0 && <button onClick={()=>remove(arr,i)} style={cancelMiniBtn}>Cancel</button>}
+      </div>
+    ))}
+    <button onClick={()=>add(arr)} style={addBtn}>+ Add</button>
+  </Section>
 );
 
+/* ===== SMALL COMPONENTS & STYLES ===== */
+const Section = ({ title, children }) => (<div style={{ marginBottom:25 }}><h4>{title}</h4>{children}</div>);
 const Input = (props) => <input {...props} style={input} />;
 
-/* ---------- STYLES ---------- */
-
-const overlay = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.6)",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-};
-
-const modal = {
-  background: "#fff",
-  width: 600,
-  maxHeight: "90vh",
-  overflowY: "auto",
-  borderRadius: 12,
-  padding: 25,
-};
-
-const input = {
-  width: "100%",
-  padding: 10,
-  marginBottom: 10,
-  borderRadius: 6,
-  border: "1px solid #ccc",
-};
-
-const textarea = { ...input, height: 90 };
-
-const serviceBox = {
-  border: "1px solid #ddd",
-  padding: 10,
-  borderRadius: 8,
-  marginBottom: 10,
-};
-
-const addBtn = {
-  background: "#e6f4ea",
-  color: "#137333",
-  padding: "8px 10px",
-  borderRadius: 6,
-  border: "none",
-};
-
-const removeBtn = {
-  background: "#fee",
-  color: "#a00",
-  padding: 6,
-  borderRadius: 6,
-  border: "none",
-};
-
-const actions = { display: "flex", justifyContent: "flex-end", gap: 10 };
-
-const saveBtn = {
-  background: "#22c55e",
-  color: "#fff",
-  padding: "10px 16px",
-  borderRadius: 8,
-  border: "none",
-};
-
-const cancelBtn = {
-  background: "#eee",
-  padding: "10px 16px",
-  borderRadius: 8,
-  border: "none",
-};
+const overlay = { position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", justifyContent:"center", alignItems:"center" };
+const modal = { background:"#fff", width:700, maxHeight:"90vh", overflowY:"auto", borderRadius:12, padding:25 };
+const input = { width:"100%", padding:10, marginBottom:10, borderRadius:6, border:"1px solid #ccc" };
+const textarea = { ...input, height:90 };
+const serviceBox = { border:"1px solid #ddd", padding:10, borderRadius:8, marginBottom:10 };
+const addBtn = { background:"#e6f4ea", padding:"8px 10px", borderRadius:6, border:"none", marginBottom:10 };
+const cancelMiniBtn = { background:"#eee", padding:6, borderRadius:6, border:"none" };
+const actions = { display:"flex", justifyContent:"flex-end", gap:10 };
+const saveBtn = { background:"#22c55e", color:"#fff", padding:"10px 16px", borderRadius:8, border:"none" };
+const cancelBtn = { background:"#eee", padding:"10px 16px", borderRadius:8, border:"none" };

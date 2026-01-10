@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 
-const API = "https://ecard-backend-pdsx.onrender.com";
+const API = "http://localhost:5001";
 
 
 export default function SignupPage() {

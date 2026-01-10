@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import CreateEcardModal from "../components/CreateEcardModal";
 
-const API = "https://ecard-backend-pdsx.onrender.com";
-
+const API = "http://localhost:5001";
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
-  const adminId = user?.id;
+  const adminId = user?.id || "admin";
 
   /* =====================
      STATE
@@ -20,11 +19,12 @@ export default function Dashboard() {
      LOAD ECARDS
   ===================== */
   const loadCards = async () => {
-    if (!adminId) return;
     try {
-      const res = await fetch(`${API}/api/ecards?adminId=${adminId}`);
+      const res = await fetch(`${API}/api/ecards`);
       const data = await res.json();
-      setCards(data || []);
+
+      // frontend filtering (flat-file backend)
+      setCards(data.filter((c) => c.adminId === adminId));
     } catch (err) {
       console.error("Failed to load ecards", err);
     }
@@ -39,13 +39,16 @@ export default function Dashboard() {
   ===================== */
   const saveCard = async (ecardData) => {
     try {
+      const payload = {
+        ...ecardData,
+        adminId,
+        id: ecardData.id || Date.now().toString(),
+      };
+
       const res = await fetch(`${API}/api/ecards`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...ecardData,   // 👈 includes id when editing
-          adminId,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -53,9 +56,16 @@ export default function Dashboard() {
         return;
       }
 
+      const saved = await res.json();
+
+      setCards((prev) =>
+        editingCard
+          ? prev.map((c) => (c.id === saved.id ? saved : c))
+          : [saved, ...prev]
+      );
+
       setShowModal(false);
       setEditingCard(null);
-      loadCards();
     } catch (err) {
       console.error("Save failed", err);
     }
@@ -65,8 +75,8 @@ export default function Dashboard() {
      EDIT
   ===================== */
   const editCard = (card) => {
-    setEditingCard(card);   // ✅ set data first
-    setShowModal(true);     // ✅ then open modal
+    setEditingCard(card);
+    setShowModal(true);
   };
 
   /* =====================
@@ -76,14 +86,19 @@ export default function Dashboard() {
     if (!window.confirm("Delete this e-card?")) return;
 
     try {
-      await fetch(
-        `${API}/api/ecards/${id}?adminId=${adminId}`,
-        { method: "DELETE" }
-      );
-      loadCards();
+      await fetch(`${API}/api/ecards/${id}`, { method: "DELETE" });
+      setCards((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
       console.error("Delete failed", err);
     }
+  };
+
+  /* =====================
+     EXPORT (ZIP)
+  ===================== */
+  const exportCard = (id) => {
+    // ⬇️ triggers backend ZIP download
+    window.location.href = `${API}/api/ecards/${id}/export`;
   };
 
   return (
@@ -95,7 +110,7 @@ export default function Dashboard() {
           <button
             style={primaryBtn}
             onClick={() => {
-              setEditingCard(null); // ✅ ensure blank form for create
+              setEditingCard(null);
               setShowModal(true);
             }}
           >
@@ -107,47 +122,41 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ECARD LIST */}
+      {/* EMPTY STATE */}
       {cards.length === 0 && (
         <p style={{ opacity: 0.6 }}>No e-cards created yet</p>
       )}
 
+      {/* ECARD LIST */}
       {cards.map((c) => (
         <div key={c.id} style={cardRow}>
           <div>
-            <h3 style={{ margin: 0 }}>{c.fullName || c.name}</h3>
+            <h3 style={{ margin: 0 }}>{c.fullName}</h3>
             <p style={sub}>{c.designation}</p>
-            <p style={sub}>{c.phone}</p>
+            <p style={sub}>{c.company}</p>
           </div>
 
           <div style={actions}>
-            <button
-              onClick={() =>
-                window.open(
-                  `${API}/api/ecards/preview/${c.id}?adminId=${adminId}`,
-                  "_blank"
-                )
-              }
-            >
+            <button onClick={() => window.open(`${API}/ecards/${c.id}`, "_blank")}>
               View
             </button>
 
-            <button
-              onClick={() =>
-                (window.location.href =
-                  `${API}/api/ecards/export/${c.id}?adminId=${adminId}`)
-              }
-            >
+            <button onClick={() => exportCard(c.id)}>
               Export
             </button>
 
-            <button onClick={() => editCard(c)}>Edit</button>
-            <button onClick={() => deleteCard(c.id)}>Delete</button>
+            <button onClick={() => editCard(c)}>
+              Edit
+            </button>
+
+            <button onClick={() => deleteCard(c.id)}>
+              Delete
+            </button>
           </div>
         </div>
       ))}
 
-      {/* OVERLAY MODAL */}
+      {/* MODAL */}
       {showModal && (
         <CreateEcardModal
           initialData={editingCard}
