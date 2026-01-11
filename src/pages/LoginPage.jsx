@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-
-const API = "http://localhost:5001";
-
+import API from "../api"; // ✅ shared API base URL
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -16,7 +14,7 @@ export default function LoginPage() {
     e.preventDefault();
 
     try {
-      const res = await fetch(`${API}/api/auth/login`, {
+      const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
