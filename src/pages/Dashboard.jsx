@@ -1,13 +1,9 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "../context/AuthContext";
 import CreateEcardModal from "../components/CreateEcardModal";
-
-const API = "https://ecard-backend-pdsx.onrender.com";
-
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
-  const adminId = user?.id;
 
   /* =====================
      STATE
@@ -17,72 +13,150 @@ export default function Dashboard() {
   const [editingCard, setEditingCard] = useState(null);
 
   /* =====================
-     LOAD ECARDS
+     LOAD FROM localStorage
   ===================== */
-  const loadCards = async () => {
-    if (!adminId) return;
-    try {
-      const res = await fetch(`${API}/api/ecards?adminId=${adminId}`);
-      const data = await res.json();
-      setCards(data || []);
-    } catch (err) {
-      console.error("Failed to load ecards", err);
-    }
-  };
-
   useEffect(() => {
-    loadCards();
-  }, [adminId]);
+    const saved = localStorage.getItem("ecards");
+    if (saved) {
+      setCards(JSON.parse(saved));
+    }
+  }, []);
+
+  /* =====================
+     SAVE TO localStorage
+  ===================== */
+  useEffect(() => {
+    localStorage.setItem("ecards", JSON.stringify(cards));
+  }, [cards]);
 
   /* =====================
      CREATE / UPDATE
   ===================== */
-  const saveCard = async (ecardData) => {
-    try {
-      const res = await fetch(`${API}/api/ecards`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...ecardData,   // 👈 includes id when editing
-          adminId,
-        }),
-      });
-
-      if (!res.ok) {
-        alert("Failed to save e-card");
-        return;
-      }
-
-      setShowModal(false);
-      setEditingCard(null);
-      loadCards();
-    } catch (err) {
-      console.error("Save failed", err);
+  const saveCard = (ecardData) => {
+    if (editingCard) {
+      setCards((prev) =>
+        prev.map((c) =>
+          c.id === editingCard.id ? { ...ecardData, id: c.id } : c
+        )
+      );
+    } else {
+      setCards((prev) => [
+        ...prev,
+        { ...ecardData, id: Date.now() },
+      ]);
     }
+
+    setShowModal(false);
+    setEditingCard(null);
   };
 
   /* =====================
      EDIT
   ===================== */
   const editCard = (card) => {
-    setEditingCard(card);   // ✅ set data first
-    setShowModal(true);     // ✅ then open modal
+    setEditingCard(card);
+    setShowModal(true);
   };
 
   /* =====================
      DELETE
   ===================== */
-  const deleteCard = async (id) => {
+  const deleteCard = (id) => {
     if (!window.confirm("Delete this e-card?")) return;
+    setCards((prev) => prev.filter((c) => c.id !== id));
+  };
 
+  /* =====================
+     EXPORT (UNCHANGED)
+  ===================== */
+  const handleExport = async (ecard) => {
     try {
-      await fetch(
-        `${API}/api/ecards/${id}?adminId=${adminId}`,
-        { method: "DELETE" }
+      const zip = new JSZip();
+      const basePath = "/templates/master-ecard";
+
+      let html = await fetch(`${basePath}/index.html`).then((r) => r.text());
+
+      const servicesHTML = (ecard.services || [])
+        .map(
+          (s) => `
+          <div class="service-box">
+            <h6>${s.title || ""}</h6>
+            <p>${s.description || ""}</p>
+          </div>`
+        )
+        .join("");
+
+      const testimonialsHTML = (ecard.testimonials || [])
+        .map(
+          (t) => `
+          <div class="testimonial-box">
+            <strong>${t.name || ""}</strong>
+            <p>${t.message || ""}</p>
+          </div>`
+        )
+        .join("");
+
+      html = html
+        .replace(/{{FULLNAME}}/g, ecard.fullName || "")
+        .replace(/{{DESIGNATION}}/g, ecard.designation || "")
+        .replace(/{{COMPANY}}/g, ecard.company || "")
+        .replace(/{{TAGLINE}}/g, ecard.tagline || "")
+        .replace(/{{ABOUT}}/g, ecard.about || "")
+        .replace(/{{PHONE}}/g, ecard.phones?.[0] || "")
+        .replace(/{{WHATSAPP}}/g, ecard.whatsapps?.[0] || "")
+        .replace(/{{EMAIL}}/g, ecard.emails?.[0] || "")
+        .replace(/{{INSTAGRAM}}/g, ecard.instagram?.[0] || "")
+        .replace(/{{FACEBOOK}}/g, ecard.facebook?.[0] || "")
+        .replace(/{{YOUTUBE}}/g, ecard.youtube?.[0] || "")
+        .replace(/{{TWITTER}}/g, ecard.twitter?.[0] || "")
+        .replace(/{{SERVICES}}/g, servicesHTML)
+        .replace(/{{TESTIMONIALS}}/g, testimonialsHTML)
+        .replace(/{{SHARE_MESSAGE}}/g, ecard.shareMessage || "")
+        .replace(/{{SLUG}}/g, ecard.slug || "");
+
+      zip.file("index.html", html);
+
+      /* ---- CSS ---- */
+      const cssZip = zip.folder("css");
+      const cssFiles = ["style.css"];
+      for (const f of cssFiles) {
+        const blob = await fetch(`${basePath}/css/${f}`).then((r) => r.blob());
+        cssZip.file(f, blob);
+      }
+
+      /* ---- IMAGES ---- */
+      const imgZip = zip.folder("images");
+      const imageFiles = ["s1.webp", "s2.webp", "LOGO.jpg"];
+      for (const f of imageFiles) {
+        const blob = await fetch(`${basePath}/images/${f}`).then((r) => r.blob());
+        imgZip.file(f, blob);
+      }
+
+      /* ---- JS ---- */
+      const jsZip = zip.folder("js");
+      const jsFiles = ["script.js"];
+      for (const f of jsFiles) {
+        const blob = await fetch(`${basePath}/js/${f}`).then((r) => r.blob());
+        jsZip.file(f, blob);
+      }
+
+      zip.folder("Videos");
+
+      zip.file(
+        "OGsnap.jpg",
+        await fetch(`${basePath}/OGsnap.jpg`).then((r) => r.blob())
       );
-      loadCards();
+
+      zip.file(
+        `${ecard.fullName || "contact"}.vcf`,
+        await fetch(`${basePath}/template.vcf`).then((r) => r.blob())
+      );
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      saveAs(blob, `${ecard.fullName || "ecard"}.zip`);
     } catch (err) {
-      console.error("Delete failed", err);
+      console.error("Export failed", err);
+      alert("Export failed. Check console.");
     }
   };
 
@@ -91,20 +165,15 @@ export default function Dashboard() {
       {/* HEADER */}
       <div style={header}>
         <h2>E-Cards Dashboard</h2>
-        <div style={{ display: "flex", gap: 12 }}>
-          <button
-            style={primaryBtn}
-            onClick={() => {
-              setEditingCard(null); // ✅ ensure blank form for create
-              setShowModal(true);
-            }}
-          >
-            + Create E-Card
-          </button>
-          <button style={logoutBtn} onClick={logout}>
-            Logout
-          </button>
-        </div>
+        <button
+          style={primaryBtn}
+          onClick={() => {
+            setEditingCard(null);
+            setShowModal(true);
+          }}
+        >
+          + Create E-Card
+        </button>
       </div>
 
       {/* ECARD LIST */}
@@ -115,39 +184,19 @@ export default function Dashboard() {
       {cards.map((c) => (
         <div key={c.id} style={cardRow}>
           <div>
-            <h3 style={{ margin: 0 }}>{c.fullName || c.name}</h3>
+            <h3 style={{ margin: 0 }}>{c.fullName}</h3>
             <p style={sub}>{c.designation}</p>
-            <p style={sub}>{c.phone}</p>
           </div>
 
           <div style={actions}>
-            <button
-              onClick={() =>
-                window.open(
-                  `${API}/api/ecards/preview/${c.id}?adminId=${adminId}`,
-                  "_blank"
-                )
-              }
-            >
-              View
-            </button>
-
-            <button
-              onClick={() =>
-                (window.location.href =
-                  `${API}/api/ecards/export/${c.id}?adminId=${adminId}`)
-              }
-            >
-              Export
-            </button>
-
+            <button onClick={() => handleExport(c)}>Export</button>
             <button onClick={() => editCard(c)}>Edit</button>
             <button onClick={() => deleteCard(c.id)}>Delete</button>
           </div>
         </div>
       ))}
 
-      {/* OVERLAY MODAL */}
+      {/* MODAL */}
       {showModal && (
         <CreateEcardModal
           initialData={editingCard}
@@ -204,14 +253,6 @@ const actions = {
 const primaryBtn = {
   background: "#22c55e",
   color: "#fff",
-  border: "none",
-  padding: "10px 16px",
-  borderRadius: 8,
-  cursor: "pointer",
-};
-
-const logoutBtn = {
-  background: "#eee",
   border: "none",
   padding: "10px 16px",
   borderRadius: 8,

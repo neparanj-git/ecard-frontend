@@ -11,55 +11,89 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
     company: "",
     tagline: "",
 
-    // CONTACTS (MULTIPLE WITH ADD BUTTONS)
+    // CONTACTS
     phones: [""],
     whatsapps: [""],
     emails: [""],
-    addresses: [""],
-    maps: [""],
 
-    // SOCIAL LINKS (REMEMBER: SINGLE, AS BEFORE)
-    instagram: "",
-    facebook: "",
-    linkedin: "",
-    youtube: "",
-    twitter: "",
+    // SOCIAL LINKS (ARRAYS)
+    instagram: [""],
+    youtube: [""],
+    twitter: [""],
+    facebook: [""],
 
     // ABOUT
     about: "",
 
+
     // SERVICES
+    highlightedServices: "",
     services: [{ title: "", description: "" }],
 
     // TESTIMONIALS
     testimonials: [{ name: "", message: "" }],
 
-    // CTA
-    ctaText: "",
-    ctaLink: "",
+    // WHATSAPP SHARE MESSAGE
+    shareMessage: "",
   };
 
   const [form, setForm] = useState(emptyForm);
 
   /* =====================
-     LOAD DATA FOR EDIT
+     LOAD DATA FOR EDIT (SAFE)
   ===================== */
   useEffect(() => {
     if (initialData) {
       setForm({
         ...emptyForm,
         ...initialData,
-        phones: initialData.phones || [""],
-        whatsapps: initialData.whatsapps || [""],
-        emails: initialData.emails || [""],
-        addresses: initialData.addresses || [""],
-        maps: initialData.maps || [""],
+
+        phones: Array.isArray(initialData.phones)
+          ? initialData.phones
+          : [initialData.phones || ""],
+
+        whatsapps: Array.isArray(initialData.whatsapps)
+          ? initialData.whatsapps
+          : [initialData.whatsapps || ""],
+
+        emails: Array.isArray(initialData.emails)
+          ? initialData.emails
+          : [initialData.emails || ""],
+
+        instagram: Array.isArray(initialData.instagram)
+          ? initialData.instagram
+          : initialData.instagram
+          ? [initialData.instagram]
+          : [""],
+
+        youtube: Array.isArray(initialData.youtube)
+          ? initialData.youtube
+          : initialData.youtube
+          ? [initialData.youtube]
+          : [""],
+
+        twitter: Array.isArray(initialData.twitter)
+          ? initialData.twitter
+          : initialData.twitter
+          ? [initialData.twitter]
+          : [""],
+
+        facebook: Array.isArray(initialData.facebook)
+          ? initialData.facebook
+          : initialData.facebook
+          ? [initialData.facebook]
+          : [""],
+
         services: initialData.services?.length
           ? initialData.services
           : [{ title: "", description: "" }],
+
         testimonials: initialData.testimonials?.length
           ? initialData.testimonials
           : [{ name: "", message: "" }],
+
+        about: initialData.about || "",
+        shareMessage: initialData.shareMessage || "",
       });
     } else {
       setForm(emptyForm);
@@ -94,12 +128,18 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
   };
 
   const addService = () => {
-    setForm({ ...form, services: [...form.services, { title: "", description: "" }] });
+    setForm({
+      ...form,
+      services: [...form.services, { title: "", description: "" }],
+    });
   };
 
   const removeService = (i) => {
-    const updated = form.services.filter((_, index) => index !== i);
-    setForm({ ...form, services: updated.length ? updated : [{ title: "", description: "" }] });
+    if (i === 0) return;
+    setForm({
+      ...form,
+      services: form.services.filter((_, index) => index !== i),
+    });
   };
 
   /* =====================
@@ -112,12 +152,18 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
   };
 
   const addTestimonial = () => {
-    setForm({ ...form, testimonials: [...form.testimonials, { name: "", message: "" }] });
+    setForm({
+      ...form,
+      testimonials: [...form.testimonials, { name: "", message: "" }],
+    });
   };
 
   const removeTestimonial = (i) => {
-    const updated = form.testimonials.filter((_, index) => index !== i);
-    setForm({ ...form, testimonials: updated.length ? updated : [{ name: "", message: "" }] });
+    if (i === 0) return;
+    setForm({
+      ...form,
+      testimonials: form.testimonials.filter((_, index) => index !== i),
+    });
   };
 
   const handleSubmit = () => {
@@ -138,43 +184,28 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
           <Input value={form.tagline} onChange={(e)=>setForm({...form,tagline:e.target.value})} placeholder="Tagline" />
         </Section>
 
-        {/* CONTACT DETAILS */}
-        <Section title="Contact Details">
-
-          {["phones","whatsapps","emails","addresses","maps"].map((key) => (
+        {/* CONTACT INFO */}
+        <Section title="Contact Info">
+          {["phones","whatsapps","emails"].map((key) => (
             <div key={key}>
-              <h5 style={{ marginBottom: 6 }}>{key.toUpperCase()}</h5>
-
-              {form[key].map((val, i) => (
-                <div key={i} style={serviceBox}>
+              <h5>{key.toUpperCase()}</h5>
+              {form[key].map((v,i)=>(
+                <div key={i} style={{ display:"flex", gap:8 }}>
                   <input
                     style={input}
-                    value={val}
+                    value={v}
                     onChange={(e)=>updateArray(key,i,e.target.value)}
-                    placeholder={`Enter ${key.slice(0,-1)}`}
+                    placeholder={key.slice(0,-1)}
                   />
-                  {form[key].length > 1 && (
-                    <button onClick={()=>removeFromArray(key,i)} style={removeBtn}>
-                      Remove
-                    </button>
+                  {i>0 && (
+                    <button onClick={()=>removeFromArray(key,i)} style={cancelMiniBtn}>✕</button>
                   )}
                 </div>
               ))}
-
-              <button onClick={()=>addToArray(key)} style={addBtn}>
-                + Add {key.slice(0,-1)}
-              </button>
+              <button onClick={()=>addToArray(key)} style={addBtn}>+ Add</button>
+              <br /><br />
             </div>
           ))}
-        </Section>
-
-        {/* SOCIAL LINKS (UNCHANGED) */}
-        <Section title="Social Links">
-          <Input value={form.instagram} onChange={(e)=>setForm({...form,instagram:e.target.value})} placeholder="Instagram URL" />
-          <Input value={form.facebook} onChange={(e)=>setForm({...form,facebook:e.target.value})} placeholder="Facebook URL" />
-          <Input value={form.linkedin} onChange={(e)=>setForm({...form,linkedin:e.target.value})} placeholder="LinkedIn URL" />
-          <Input value={form.youtube} onChange={(e)=>setForm({...form,youtube:e.target.value})} placeholder="YouTube URL" />
-          <Input value={form.twitter} onChange={(e)=>setForm({...form,twitter:e.target.value})} placeholder="Twitter / X URL" />
         </Section>
 
         {/* ABOUT */}
@@ -183,17 +214,43 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
             style={textarea}
             value={form.about}
             onChange={(e)=>setForm({...form,about:e.target.value})}
-            placeholder="About you / business"
+            placeholder="Write something about yourself or your business"
           />
+        </Section>
+
+        {/* SOCIAL LINKS */}
+        <Section title="Social Media Links">
+          {["instagram","youtube","twitter","facebook"].map((platform) => (
+            <div key={platform}>
+              <h5>{platform.charAt(0).toUpperCase()+platform.slice(1)}</h5>
+              {form[platform].map((link,i)=>(
+                <div key={i} style={{ display:"flex", gap:8 }}>
+                  <input
+                    style={input}
+                    value={link}
+                    onChange={(e)=>updateArray(platform,i,e.target.value)}
+                    placeholder={`${platform} link`}
+                  />
+                  {i>0 && (
+                    <button onClick={()=>removeFromArray(platform,i)} style={cancelMiniBtn}>✕</button>
+                  )}
+                </div>
+              ))}
+              <button onClick={()=>addToArray(platform)} style={addBtn}>
+                + Add {platform}
+              </button>
+              <br /><br />
+            </div>
+          ))}
         </Section>
 
         {/* SERVICES */}
         <Section title="Services">
           {form.services.map((s,i)=>(
             <div key={i} style={serviceBox}>
-              <input style={input} value={s.title} onChange={(e)=>updateService(i,"title",e.target.value)} placeholder="Service Title" />
-              <input style={input} value={s.description} onChange={(e)=>updateService(i,"description",e.target.value)} placeholder="Service Description" />
-              {form.services.length>1 && <button onClick={()=>removeService(i)} style={removeBtn}>Remove</button>}
+              <input style={input} value={s.title} onChange={(e)=>updateService(i,"title",e.target.value)} placeholder="Service Title"/>
+              <input style={input} value={s.description} onChange={(e)=>updateService(i,"description",e.target.value)} placeholder="Service Description"/>
+              {i>0 && <button onClick={()=>removeService(i)} style={cancelMiniBtn}>Cancel</button>}
             </div>
           ))}
           <button onClick={addService} style={addBtn}>+ Add Service</button>
@@ -203,18 +260,22 @@ export default function CreateEcardModal({ onClose, onSave, initialData }) {
         <Section title="Testimonials">
           {form.testimonials.map((t,i)=>(
             <div key={i} style={serviceBox}>
-              <input style={input} value={t.name} onChange={(e)=>updateTestimonial(i,"name",e.target.value)} placeholder="Client Name" />
-              <textarea style={textarea} value={t.message} onChange={(e)=>updateTestimonial(i,"message",e.target.value)} placeholder="Message" />
-              {form.testimonials.length>1 && <button onClick={()=>removeTestimonial(i)} style={removeBtn}>Remove</button>}
+              <input style={input} value={t.name} onChange={(e)=>updateTestimonial(i,"name",e.target.value)} placeholder="Client Name"/>
+              <textarea style={textarea} value={t.message} onChange={(e)=>updateTestimonial(i,"message",e.target.value)} placeholder="Message"/>
+              {i>0 && <button onClick={()=>removeTestimonial(i)} style={cancelMiniBtn}>Cancel</button>}
             </div>
           ))}
           <button onClick={addTestimonial} style={addBtn}>+ Add Testimonial</button>
         </Section>
 
-        {/* CTA */}
-        <Section title="Call To Action">
-          <Input value={form.ctaText} onChange={(e)=>setForm({...form,ctaText:e.target.value})} placeholder="Button Text" />
-          <Input value={form.ctaLink} onChange={(e)=>setForm({...form,ctaLink:e.target.value})} placeholder="Button Link" />
+        {/* SHARE MESSAGE */}
+        <Section title="Share Message (WhatsApp)">
+          <textarea
+            style={textarea}
+            value={form.shareMessage}
+            onChange={(e)=>setForm({...form,shareMessage:e.target.value})}
+            placeholder="WhatsApp message (link added automatically)"
+          />
         </Section>
 
         <div style={actions}>
@@ -250,7 +311,7 @@ const overlay = {
 
 const modal = {
   background: "#fff",
-  width: 600,
+  width: 650,
   maxHeight: "90vh",
   overflowY: "auto",
   borderRadius: 12,
@@ -282,15 +343,18 @@ const addBtn = {
   border: "none",
 };
 
-const removeBtn = {
-  background: "#fee",
-  color: "#a00",
+const cancelMiniBtn = {
+  background: "#eee",
   padding: 6,
   borderRadius: 6,
   border: "none",
 };
 
-const actions = { display: "flex", justifyContent: "flex-end", gap: 10 };
+const actions = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: 10,
+};
 
 const saveBtn = {
   background: "#22c55e",
